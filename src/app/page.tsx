@@ -1,65 +1,149 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { Coin } from "@/lib/types";
+import CryptoCard from "@/components/CryptoCard";
+import CryptoChart from "@/components/CryptoChart";
+import SearchBar from "@/components/SearchBar";
+import StatsBar from "@/components/StatsBar";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Home() {
+  const [coins, setCoins] = useState<Coin[]>([]);
+  const [selectedCoin, setSelectedCoin] = useState<Coin | null>(null);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all" | "gainers" | "losers">("all");
+  const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const fetchCoins = useCallback(async () => {
+    try {
+      const response = await fetch("/api/crypto");
+      const data = await response.json();
+      setCoins(data);
+      setLastUpdated(new Date());
+      if (!selectedCoin && data.length > 0) {
+        setSelectedCoin(data[0]);
+      } else if (selectedCoin) {
+        const updated = data.find((c: Coin) => c.id === selectedCoin.id);
+        if (updated) setSelectedCoin(updated);
+      }
+    } catch (error) {
+      console.error("Error fetching coins:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedCoin]);
+
+  useEffect(() => {
+    fetchCoins();
+    const interval = setInterval(fetchCoins, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const filteredCoins = coins
+    .filter((c) => {
+      if (filter === "gainers") return c.price_change_percentage_24h > 0;
+      if (filter === "losers") return c.price_change_percentage_24h < 0;
+      return true;
+    })
+    .filter(
+      (c) =>
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.symbol.toLowerCase().includes(search.toLowerCase()),
+    );
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-white">CryptoDash</h1>
+            <p className="text-slate-400 text-sm mt-1">
+              {lastUpdated
+                ? `Actualizado: ${lastUpdated.toLocaleTimeString("es-AR")}`
+                : "Cargando..."}
+            </p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <SearchBar value={search} onChange={setSearch} />
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => setFilter("all")}
+                className={
+                  filter === "all"
+                    ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                    : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                }
+              >
+                Todos
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setFilter("gainers")}
+                className={
+                  filter === "gainers"
+                    ? "bg-green-600 hover:bg-green-700 text-white"
+                    : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                }
+              >
+                En alza
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setFilter("losers")}
+                className={
+                  filter === "losers"
+                    ? "bg-red-600 hover:bg-red-700 text-white"
+                    : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                }
+              >
+                En baja
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Stats */}
+        {!loading && coins.length > 0 && <StatsBar coins={coins} />}
+
+        {/* Main grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+          {/* Coin list */}
+          <div className="xl:col-span-1 grid grid-cols-1 gap-3 max-h-[600px] overflow-y-auto pr-1">
+            {loading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-24 bg-slate-700" />
+              ))
+            ) : filteredCoins.length === 0 ? (
+              <p className="text-slate-400 text-center py-8">
+                No se encontraron resultados
+              </p>
+            ) : (
+              filteredCoins.map((coin) => (
+                <CryptoCard
+                  key={coin.id}
+                  coin={coin}
+                  onClick={setSelectedCoin}
+                  selected={selectedCoin?.id === coin.id}
+                />
+              ))
+            )}
+          </div>
+
+          {/* Chart */}
+          <div className="xl:col-span-2">
+            {loading ? (
+              <Skeleton className="h-96 bg-slate-700" />
+            ) : selectedCoin ? (
+              <CryptoChart coin={selectedCoin} />
+            ) : null}
+          </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }
